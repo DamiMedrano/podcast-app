@@ -2,26 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+@import url('https://fonts.googleapis.com/css?family=Quicksand&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  color: #5A5A5E;
+  font-family: 'Quicksand', sans-serif;
+  transition: ease-in-out 0.1s;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+#root > div {
+  min-height: 100vh;
+  padding: 4% 16% 20%;
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+.App {
+  text-align: center;
+  background: linear-gradient(0deg, rgba(10, 10, 10, 0.2), rgba(10, 10, 10, 0.2)), linear-gradient(131.55deg, #1B1B1B 0%, #14151F 88.91%);
+  min-height: 100vh;
+  width: 100%;
 }
+
+td, th {
+  padding: 0px 4px;
+}
+
+.Podcast {
+  background:
+    linear-gradient(0deg, rgba(10, 10, 10, 0.2), rgba(10, 10, 10, 0.2)),
+    linear-gradient(131.55deg, #1B1B1B 0%, #14151F 88.91%);
+}
+
+.truncate-multiline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.truncate-2-lines {
+  -webkit-line-clamp: 2;
+}
+.truncate-1-line {
+  -webkit-line-clamp: 1;
+}
+
+
