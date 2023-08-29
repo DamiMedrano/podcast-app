@@ -1,113 +1,173 @@
-import Image from 'next/image'
+'use client'
+import { useState, useEffect } from 'react';
+import getPodcasts from './api/getPodcasts';
+import getEpisodes from './api/getEpisodes';
+import { formatPodcasts, formatEpisodes } from './utils/formatDatafromApi';
+import { Podcast } from './types/Podcast';
+import { usePodcastContext } from './context/PodcastAppContext';
+import Table from './components/Table';
+import ArtistCard from './components/ArtistCard';
+import AudioPlayer from './components/AudioPlayer';
+import Link from 'next/link';
+import SearchBar from './components/SearchBar';
+import Dropdown from './components/Dropdown';
+import Loading from './loading';
+import PlayButton from './components/PlayButton';
 
-export default function Home() {
+const Page = () => {
+  const [loading, setLoading] = useState(false);
+  const [podcasts, setPodcasts] = useState<Podcast[]>([]);
+  const {togglePlay, isPlaying, setCurrentEpisode, episodeLoading, setEpisodeLoading, episodes, setEpisodes } = usePodcastContext();
+  const [filteredPodcasts, setFilteredPodcasts] = useState<Podcast[]>([]);
+  const [sortedPodcasts, setSortedPodcasts] = useState<Podcast[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSorting, setSelectedSorting] = useState('Order by');
+  const [playingPodcastId, setPlayingPodcastId] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    setLoading(true);
+    const cachedPodcasts = localStorage.getItem('cachedPodcasts');
+    if (cachedPodcasts) {
+      try {
+        setPodcasts(JSON.parse(cachedPodcasts));
+      } catch (e) {
+        console.error('Error parsing cachedPodcasts:', e);
+      }
+      setLoading(false);
+    }
+
+    const getPodcastsData = async () => {
+      try {
+        const response = await getPodcasts();
+        const podcastsFormatted = formatPodcasts(response);
+        localStorage.setItem('cachedPodcasts', JSON.stringify(podcastsFormatted));
+        if(!cachedPodcasts) {
+          setPodcasts(podcastsFormatted);
+        }
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching podcasts: ', error);
+        setLoading(false);
+      }
+    };
+    getPodcastsData();
+  }, []);
+
+
+  useEffect(() => {
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+    const filtered = podcasts.filter((podcast: Podcast) =>
+      podcast.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+      podcast.artist.toLowerCase().includes(lowerCaseSearchTerm) ||
+      podcast.description.toLowerCase().includes(lowerCaseSearchTerm)
+    );
+
+    setFilteredPodcasts(filtered);
+  }, [searchTerm, podcasts]);
+
+
+  useEffect(() => {
+    let sorted = [...filteredPodcasts];
+    if (selectedSorting === 'Name') {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (selectedSorting === 'Description') {
+      sorted.sort((a, b) => a.description.localeCompare(b.description));
+    } else if (selectedSorting === 'Released') {
+      sorted.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate));
+    } else if (selectedSorting === 'Artist') {
+      sorted.sort((a, b) => a.artist.localeCompare(b.artist));
+    }
+    setSortedPodcasts(sorted);
+  }, [filteredPodcasts, selectedSorting]);
+
+  
+  const handlePlayButtonClick = (id: string) => {
+    if (id === playingPodcastId) {
+      togglePlay();
+      return;
+    } else {
+      setPlayingPodcastId(id);
+    }
+
+    setEpisodeLoading(true);
+    
+    const cachedEpisodes = localStorage.getItem(`cachedEpisodes_${id}`);
+    if (cachedEpisodes) {
+      setEpisodes(JSON.parse(cachedEpisodes));
+      setCurrentEpisode(cachedEpisodes[cachedEpisodes.length - 1]);
+    }
+
+    
+    const getEpisodesData = async () => {
+      try {
+        const response = await getEpisodes(id);
+        const episodesFormatted = formatEpisodes(response);
+        if(!cachedEpisodes) {
+          setEpisodes(episodesFormatted);
+          setCurrentEpisode(episodesFormatted[1]);
+        }
+        setEpisodeLoading(false);
+        localStorage.setItem(`cachedEpisodes_${id}`, JSON.stringify(episodesFormatted));
+      } catch (error) {
+        console.error('Error fetching episodes: ', error);
+        setEpisodeLoading(false);
+      }
+    }
+    getEpisodesData();
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+    <div className='App'>
+      {loading ? (
+        <>
+          <Loading />
+          <h1>{podcasts ? "podcast exists" : 'Loading...'}</h1>
+        </>
+      ) : (
+        <>
+        
+        <button onClick={() => localStorage.clear()} className='absolute top-4 right-4'>clear cache</button>
+          <div className='w-full '>
+            <SearchBar onSearch={setSearchTerm} searchBy='Podcast' />
+            <Dropdown options={['Order by', 'Name', 'Description', 'Released', 'Artist']} onOptionSelect={setSelectedSorting} />
+          </div>
+          <Table headers={['#', 'Name', 'Description', 'Released']}>
+            {sortedPodcasts.map((podcast: Podcast, index: number) => (
+              <tr key={podcast.id} className='h-20 border-b-[1px] border-[#FFFFFF08]'>
+                <td className='h-[80px] flex justify-center items-center'>
+                  <PlayButton
+                    isActive={podcast.id === playingPodcastId}
+                    isAudioLoading={episodeLoading && podcast.id === playingPodcastId}
+                    isAudioPlaying={isPlaying && podcast.id === playingPodcastId}
+                    size='small'
+                    handleClick={() => handlePlayButtonClick(podcast.id)}
+                  />
+                </td>
+                <td className='w-[20%] min-w-[300px]'>
+                  <Link href={`/podcast/${podcast.id}`}>
+                    <ArtistCard
+                      thumbnail={podcast.thumbnail}
+                      title={podcast.name}
+                      artist={podcast.artist}
+                    />
+                  </Link>
+                </td>
+                <td>
+                  <p className='text-left truncate-multiline truncate-2-lines mx-8'>
+                    {podcast.description}
+                  </p>
+                </td>
+                <td className='min-w-[120px]'>{podcast.releaseDate}</td>
+              </tr>
+            ))}
+          </Table>
+        </>
+      )}
+      <AudioPlayer />
+    </div>
+  );
+};
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
-}
+export default Page;
